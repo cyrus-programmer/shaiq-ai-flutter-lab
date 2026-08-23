@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "citeguard-rag-api"
+version = "1.0.0"
+description = "A small, grounded RAG API with citations and safety guardrails"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Muhammad Shaiq Paracha"}]
+
+[project.scripts]
+citeguard = "citeguard.api:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
