@@ -1,0 +1,15 @@
+{
+  "name": "n8n-sla-sentinel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A tested n8n support intake and SLA triage workflow",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-workflow.mjs",
+    "check:generated": "node scripts/build-workflow.mjs --check",
+    "test": "npm run check:generated && node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

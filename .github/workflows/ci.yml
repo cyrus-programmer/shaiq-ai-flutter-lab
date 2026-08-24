@@ -21,3 +21,16 @@ jobs:
           python-version: "3.12"
       - name: Compile and test
         run: make check
+
+  sla-sentinel:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: projects/n8n-sla-sentinel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate generated workflow and run tests
+        run: npm test

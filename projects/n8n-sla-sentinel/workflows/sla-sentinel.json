@@ -1,0 +1,322 @@
+{
+  "name": "SLA Sentinel - Support Intake and Triage",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "support-intake",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "0cce338a-5b22-4df2-847a-e82695d72ed2",
+      "name": "Support Intake Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -900,
+        0
+      ],
+      "webhookId": "a07a16b8-0f28-446b-9dfa-cf3d93c938ae"
+    },
+    {
+      "parameters": {
+        "jsCode": "const source = $input.first().json;\nconst body = source.body && typeof source.body === 'object' ? source.body : source;\nconst text = (value) => typeof value === 'string' ? value.trim() : '';\nconst ticketId = text(body.ticket_id);\nconst subject = text(body.subject);\nconst message = text(body.message);\nconst email = text(body.customer_email).toLowerCase();\nconst tier = text(body.customer_tier).toLowerCase() || 'standard';\nconst channel = text(body.channel).toLowerCase() || 'webhook';\nconst affectedUsers = Number(body.affected_users ?? 0);\nconst errors = [];\n\nif (ticketId.length < 1 || ticketId.length > 100) errors.push('ticket_id must be 1 to 100 characters');\nif (subject.length < 3 || subject.length > 200) errors.push('subject must be 3 to 200 characters');\nif (message.length < 10 || message.length > 5000) errors.push('message must be 10 to 5000 characters');\nif (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) errors.push('customer_email must be valid');\nif (!Number.isInteger(affectedUsers) || affectedUsers < 0 || affectedUsers > 1000000) {\n  errors.push('affected_users must be an integer from 0 to 1000000');\n}\nif (!['standard', 'premium', 'enterprise'].includes(tier)) {\n  errors.push('customer_tier must be standard, premium, or enterprise');\n}\n\nconst occurredAt = text(body.occurred_at);\nif (occurredAt && Number.isNaN(Date.parse(occurredAt))) errors.push('occurred_at must be an ISO-8601 date');\n\nreturn [{\n  json: {\n    valid: errors.length === 0,\n    errors,\n    received_at: new Date().toISOString(),\n    ticket: {\n      id: ticketId,\n      subject,\n      message,\n      customer_email: email || null,\n      customer_tier: tier,\n      affected_users: Number.isFinite(affectedUsers) ? affectedUsers : 0,\n      channel,\n      occurred_at: occurredAt || null\n    }\n  }\n}];\n"
+      },
+      "id": "c431a86d-5b75-45c7-8ae2-dd69f31f55b5",
+      "name": "Normalize and Validate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -680,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1b025173-8536-4795-9ee4-ce8c7943e117-condition",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1b025173-8536-4795-9ee4-ce8c7943e117",
+      "name": "Valid Ticket?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -460,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst ticket = input.ticket;\nconst combined = `${ticket.subject} ${ticket.message}`.toLowerCase();\nlet score = 0;\nconst reasons = [];\n\nconst addOnce = (pattern, points, reason) => {\n  if (pattern.test(combined)) {\n    score += points;\n    reasons.push(reason);\n  }\n};\n\naddOnce(/\\b(outage|down|unavailable|offline|production broken)\\b/, 45, 'service outage');\naddOnce(/\\b(security|breach|hacked|compromised|ransomware|data leak)\\b/, 50, 'security impact');\naddOnce(/\\b(payment|checkout|billing|charged|transaction)\\b/, 25, 'payment impact');\naddOnce(/\\b(data loss|deleted|corrupt|missing data)\\b/, 40, 'data integrity impact');\naddOnce(/\\b(urgent|immediately|critical|emergency)\\b/, 15, 'urgent language');\naddOnce(/\\b(blocked|cannot work|can't work|stopped working)\\b/, 15, 'customer blocked');\n\nif (ticket.customer_tier === 'enterprise') {\n  score += 20;\n  reasons.push('enterprise customer');\n} else if (ticket.customer_tier === 'premium') {\n  score += 10;\n  reasons.push('premium customer');\n}\n\nif (ticket.affected_users >= 100) {\n  score += 25;\n  reasons.push(`${ticket.affected_users} users affected`);\n} else if (ticket.affected_users >= 10) {\n  score += 15;\n  reasons.push(`${ticket.affected_users} users affected`);\n} else if (ticket.affected_users > 1) {\n  score += 5;\n  reasons.push(`${ticket.affected_users} users affected`);\n}\n\nscore = Math.min(score, 100);\nlet severity = 'low';\nlet slaMinutes = 480;\nlet route = 'support_standard';\nif (score >= 75) {\n  severity = 'critical';\n  slaMinutes = 15;\n  route = 'on_call';\n} else if (score >= 50) {\n  severity = 'high';\n  slaMinutes = 60;\n  route = 'on_call';\n} else if (score >= 25) {\n  severity = 'medium';\n  slaMinutes = 240;\n  route = 'support_priority';\n}\n\nconst redact = (value) => value\n  .replace(/\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b/gi, '[EMAIL_REDACTED]')\n  .replace(/\\b(?:\\d[ -]*?){13,19}\\b/g, '[CARD_REDACTED]')\n  .replace(/(?<!\\w)(?:\\+?\\d[\\d .()-]{7,}\\d)(?!\\w)/g, '[PHONE_REDACTED]');\nconst safePreview = redact(ticket.message).slice(0, 280);\nconst baseTime = ticket.occurred_at ? new Date(ticket.occurred_at) : new Date(input.received_at);\nconst acknowledgeBy = new Date(baseTime.getTime() + slaMinutes * 60_000).toISOString();\n\nreturn [{\n  json: {\n    accepted: true,\n    ticket_id: ticket.id,\n    severity,\n    score,\n    route,\n    is_urgent: severity === 'critical' || severity === 'high',\n    sla_minutes: slaMinutes,\n    acknowledge_by: acknowledgeBy,\n    reasons: reasons.length ? reasons : ['no elevated risk signals'],\n    safe_preview: safePreview,\n    received_at: input.received_at\n  }\n}];\n"
+      },
+      "id": "1c68d719-41e8-42ec-b710-d572289a2313",
+      "name": "Compute Severity and SLA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5982efb8-6d1b-4527-81c2-751a2cad9f91-condition",
+              "leftValue": "={{ $json.is_urgent }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5982efb8-6d1b-4527-81c2-751a2cad9f91",
+      "name": "Urgent?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const triage = $input.first().json;\nreturn [{ json: { ...triage, action: 'page_on_call' } }];\n"
+      },
+      "id": "d0658986-731a-48c6-83ea-bc9a8787ccbb",
+      "name": "Prepare Urgent Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "a87d87a5-5be3-4ddf-adb4-bb20a3d15ffc",
+      "name": "Respond Urgent",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        500,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const triage = $input.first().json;\nreturn [{ json: { ...triage, action: 'queue_for_support' } }];\n"
+      },
+      "id": "97550fb5-d91e-4a73-b3dd-7463068e0394",
+      "name": "Prepare Standard Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -20
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "92bc33dc-96d0-4839-a038-df3c35e28da7",
+      "name": "Respond Standard",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        500,
+        -20
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nreturn [{\n  json: {\n    accepted: false,\n    error: 'invalid_ticket',\n    details: input.errors,\n    received_at: input.received_at\n  }\n}];\n"
+      },
+      "id": "3ec7bc52-e65e-4b78-985e-50e4b3797dad",
+      "name": "Prepare Rejection",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -220,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "84e30f19-1e0e-443d-b4eb-1fc51dc23813",
+      "name": "Respond Invalid",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        40,
+        180
+      ]
+    }
+  ],
+  "connections": {
+    "Support Intake Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize and Validate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize and Validate": {
+      "main": [
+        [
+          {
+            "node": "Valid Ticket?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid Ticket?": {
+      "main": [
+        [
+          {
+            "node": "Compute Severity and SLA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Rejection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Severity and SLA": {
+      "main": [
+        [
+          {
+            "node": "Urgent?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Urgent?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Urgent Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Standard Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Urgent Response": {
+      "main": [
+        [
+          {
+            "node": "Respond Urgent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Standard Response": {
+      "main": [
+        [
+          {
+            "node": "Respond Standard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Rejection": {
+      "main": [
+        [
+          {
+            "node": "Respond Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "active": false,
+  "versionId": "436a3cb8-05af-4fb4-8b0f-1ba2110e615e",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}
