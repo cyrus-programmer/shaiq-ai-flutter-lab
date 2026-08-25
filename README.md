@@ -10,6 +10,7 @@ repeatable validation instead of relying on screenshots or unverified claims.
 | --- | --- | --- |
 | [CiteGuard RAG API](projects/citeguard-rag-api) | AI / backend | Grounded retrieval, citations, abstention, PII redaction, injection defence, optional LLM generation, and a dependency-free HTTP API |
 | [SLA Sentinel](projects/n8n-sla-sentinel) | n8n automation | Validated support intake, deterministic priority scoring, PII-safe summaries, SLA calculation, native routing, and reproducible workflow tests |
+| [Resilient Feature Kit](projects/flutter-resilient-feature-kit) | Flutter package | Stale-while-revalidate caching, bounded retries, request coalescing, optimistic updates, lifecycle safety, and reusable state widgets |
 
 ## Engineering principles
 
