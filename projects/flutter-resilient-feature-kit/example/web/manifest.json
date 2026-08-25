@@ -1,0 +1,9 @@
+{
+  "name": "Resilient Feature Kit",
+  "short_name": "Resilient Kit",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#F7F8FC",
+  "theme_color": "#3156D3",
+  "description": "Interactive example for resilient Flutter data screens"
+}
