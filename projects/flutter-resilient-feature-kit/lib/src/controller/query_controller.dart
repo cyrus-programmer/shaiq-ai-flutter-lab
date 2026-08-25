@@ -35,7 +35,7 @@ final class QueryController<T> extends ChangeNotifier {
   final Clock _clock;
   final Sleeper _sleeper;
 
-  LoadState<T> _state = const LoadIdle<T>();
+  LoadState<T> _state = LoadIdle<T>();
   int _generation = 0;
   bool _disposed = false;
 

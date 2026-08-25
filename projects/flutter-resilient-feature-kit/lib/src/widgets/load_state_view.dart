@@ -144,3 +144,4 @@ final class _DefaultError extends StatelessWidget {
           ),
         ),
       );
+}
