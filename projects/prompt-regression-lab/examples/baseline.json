@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "suite": "support-triage-contract",
+  "suite_digest": "approved-example-baseline",
+  "provider_type": "fixture",
+  "started_at": "2026-08-26T00:00:00+00:00",
+  "duration_ms": 0,
+  "passed": true,
+  "summary": {"total": 3, "passed": 3, "failed": 0},
+  "cases": [
+    {"id": "refund-normal", "passed": true, "latency_ms": 0, "expectations": []},
+    {"id": "security-urgent", "passed": true, "latency_ms": 0, "expectations": []},
+    {"id": "product-question", "passed": true, "latency_ms": 0, "expectations": []}
+  ]
+}

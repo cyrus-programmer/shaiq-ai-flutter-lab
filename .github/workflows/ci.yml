@@ -57,3 +57,18 @@ jobs:
           cd example
           flutter pub get
           flutter build web
+
+  prompt-regression-lab:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: projects/prompt-regression-lab
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and test
+        run: make check
+      - name: Run sample evaluation gate
+        run: make demo

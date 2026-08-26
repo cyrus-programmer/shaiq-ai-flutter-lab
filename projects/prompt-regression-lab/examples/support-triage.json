@@ -1,0 +1,46 @@
+{
+  "name": "support-triage-contract",
+  "provider": {
+    "type": "fixture",
+    "responses": {
+      "refund-normal": "{\"category\":\"billing\",\"priority\":\"normal\",\"reason\":\"refund status\"}",
+      "security-urgent": "{\"category\":\"security\",\"priority\":\"urgent\",\"reason\":\"possible account compromise\"}",
+      "product-question": "{\"category\":\"product\",\"priority\":\"normal\",\"reason\":\"feature guidance\"}"
+    }
+  },
+  "defaults": {
+    "system": "Classify support requests. Return compact JSON only.",
+    "temperature": 0
+  },
+  "cases": [
+    {
+      "id": "refund-normal",
+      "prompt": "Classify this request: {message}",
+      "variables": {"message": "Where is the refund for my cancelled order?"},
+      "expectations": [
+        {"type": "json_path", "path": "category", "equals": "billing"},
+        {"type": "json_path", "path": "priority", "equals": "normal"},
+        {"type": "not_contains", "value": "password", "case_sensitive": false}
+      ]
+    },
+    {
+      "id": "security-urgent",
+      "prompt": "Classify this request: {message}",
+      "variables": {"message": "Someone changed my password and I cannot sign in."},
+      "expectations": [
+        {"type": "json_path", "path": "category", "equals": "security"},
+        {"type": "json_path", "path": "priority", "equals": "urgent"},
+        {"type": "regex", "pattern": "compromise|takeover", "case_sensitive": false}
+      ]
+    },
+    {
+      "id": "product-question",
+      "prompt": "Classify this request: {message}",
+      "variables": {"message": "How do I export a monthly report?"},
+      "expectations": [
+        {"type": "json_path", "path": "category", "equals": "product"},
+        {"type": "contains", "value": "feature guidance"}
+      ]
+    }
+  ]
+}
