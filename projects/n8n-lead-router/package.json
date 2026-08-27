@@ -1,0 +1,14 @@
+{
+  "name": "n8n-lead-router",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-workflow.mjs",
+    "check": "node --check scripts/build-workflow.mjs && node -e \"JSON.parse(require('node:fs').readFileSync('workflows/lead-router.json', 'utf8'))\"",
+    "test": "npm run build && npm run check && node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

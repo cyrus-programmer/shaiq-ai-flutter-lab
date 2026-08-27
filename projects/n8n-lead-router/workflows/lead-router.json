@@ -1,0 +1,363 @@
+{
+  "name": "Lead Router - Privacy-aware ICP qualification",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-router",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "lead-intake",
+      "name": "Lead Intake",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $json.body ?? $json;\nconst text = (value, max = 200) => String(value ?? '').trim().slice(0, max);\nconst list = (name, fallback) => text($env[name] || fallback, 1000)\n  .split(',').map((value) => value.trim().toLowerCase()).filter(Boolean);\n\nconst email = text(input.email, 254).toLowerCase();\nconst company = text(input.company, 160);\nconst website = text(input.website, 300).toLowerCase().replace(/\\/$/, '');\nconst employeeCount = Number.parseInt(input.employeeCount, 10);\nconst annualBudget = Number.parseFloat(input.annualBudget);\nconst submittedAt = text(input.submittedAt, 40);\nconst source = text(input.source || 'unknown', 60).toLowerCase();\nconst painPoint = text(input.painPoint, 1200);\nconst consent = input.consent === true;\n\nconst errors = [];\nif (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) errors.push('email must be valid');\nif (company.length < 2) errors.push('company must contain at least 2 characters');\nif (!Number.isFinite(employeeCount) || employeeCount < 1 || employeeCount > 10000000) {\n  errors.push('employeeCount must be an integer between 1 and 10000000');\n}\nif (!Number.isFinite(annualBudget) || annualBudget < 0 || annualBudget > 1000000000) {\n  errors.push('annualBudget must be between 0 and 1000000000');\n}\nif (!submittedAt || Number.isNaN(Date.parse(submittedAt))) errors.push('submittedAt must be ISO-8601');\nif (painPoint.length < 20) errors.push('painPoint must contain at least 20 characters');\n\nconst domain = email.includes('@') ? email.split('@').at(-1) : '';\nconst freeDomains = new Set(['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com']);\nconst country = text(input.country, 2).toLowerCase();\nconst industry = text(input.industry, 80).toLowerCase();\nconst targetIndustries = list('TARGET_INDUSTRIES', 'healthcare,saas,fintech,ecommerce');\nconst targetCountries = list('TARGET_COUNTRIES', 'us,ca,gb,de,au');\nconst owners = list('SALES_OWNERS', 'sales@example.com');\n\nreturn [{ json: {\n  accepted: errors.length === 0,\n  errors,\n  lead: {\n    email, company, website, employeeCount, annualBudget, submittedAt,\n    source, painPoint, consent, country: country.toUpperCase(), industry,\n  },\n  policy: { targetIndustries, targetCountries, owners },\n  signals: {\n    businessEmail: Boolean(domain) && !freeDomains.has(domain),\n    targetIndustry: targetIndustries.includes(industry),\n    targetCountry: targetCountries.includes(country),\n  },\n} }];\n"
+      },
+      "id": "normalize-+-validate",
+      "name": "Normalize + Validate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.accepted }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "valid-payload?",
+      "name": "Valid Payload?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { lead, signals, policy } = $json;\nconst reasons = [];\nlet score = 0;\n\nconst add = (points, reason) => { score += points; reasons.push({ points, reason }); };\nif (signals.businessEmail) add(15, 'business email');\nif (signals.targetIndustry) add(20, 'target industry');\nif (signals.targetCountry) add(10, 'target country');\nif (lead.employeeCount >= 20 && lead.employeeCount <= 2000) add(20, 'target company size');\nelse if (lead.employeeCount > 2000) add(10, 'enterprise company size');\nif (lead.annualBudget >= 25000) add(25, 'budget at or above 25000');\nelse if (lead.annualBudget >= 10000) add(15, 'budget at or above 10000');\nelse if (lead.annualBudget >= 5000) add(5, 'budget at or above 5000');\nif (lead.painPoint.length >= 80) add(10, 'detailed pain point');\n\nscore = Math.min(score, 100);\nconst route = !lead.consent ? 'rejected' : score >= 70 ? 'sales' : score >= 40 ? 'nurture' : 'rejected';\nconst ownerIndex = [...lead.company.toLowerCase()].reduce((sum, char) => sum + char.charCodeAt(0), 0)\n  % policy.owners.length;\n\nreturn [{ json: {\n  ...$json,\n  qualification: {\n    score,\n    route,\n    reasons,\n    owner: route === 'sales' ? policy.owners[ownerIndex] : null,\n  },\n} }];\n"
+      },
+      "id": "score-icp-fit",
+      "name": "Score ICP Fit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.qualification.route }}",
+              "rightValue": "sales",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "sales-qualified?",
+      "name": "Sales Qualified?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        880,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.qualification.route }}",
+              "rightValue": "nurture",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "nurture-qualified?",
+      "name": "Nurture Qualified?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { lead, qualification } = $json;\nconst safeEmail = lead.email.replace(/^(.{1,2}).*(@.*)$/, '$1***$2');\nreturn [{ json: {\n  ok: qualification.route !== 'rejected',\n  route: qualification.route,\n  score: qualification.score,\n  owner: qualification.owner,\n  lead: { company: lead.company, email: safeEmail, source: lead.source },\n  reasons: qualification.reasons,\n} }];\n"
+      },
+      "id": "prepare-sales-handoff",
+      "name": "Prepare Sales Handoff",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { lead, qualification } = $json;\nconst safeEmail = lead.email.replace(/^(.{1,2}).*(@.*)$/, '$1***$2');\nreturn [{ json: {\n  ok: qualification.route !== 'rejected',\n  route: qualification.route,\n  score: qualification.score,\n  owner: qualification.owner,\n  lead: { company: lead.company, email: safeEmail, source: lead.source },\n  reasons: qualification.reasons,\n} }];\n"
+      },
+      "id": "prepare-nurture-handoff",
+      "name": "Prepare Nurture Handoff",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.accepted === false\n  ? { ok: false, route: 'invalid', errors: $json.errors }\n  : { ok: false, route: 'rejected', reason: $json.lead.consent ? 'outside current qualification policy' : 'consent required' };\nreturn [{ json: body }];\n"
+      },
+      "id": "prepare-rejection",
+      "name": "Prepare Rejection",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "sales-response",
+      "name": "Sales Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1540,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "nurture-response",
+      "name": "Nurture Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1540,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 422
+        }
+      },
+      "id": "rejected-response",
+      "name": "Rejected Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1100,
+        500
+      ]
+    }
+  ],
+  "connections": {
+    "Lead Intake": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Validate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize + Validate": {
+      "main": [
+        [
+          {
+            "node": "Valid Payload?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid Payload?": {
+      "main": [
+        [
+          {
+            "node": "Score ICP Fit",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Rejection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score ICP Fit": {
+      "main": [
+        [
+          {
+            "node": "Sales Qualified?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sales Qualified?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Sales Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nurture Qualified?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nurture Qualified?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Nurture Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Rejection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Sales Handoff": {
+      "main": [
+        [
+          {
+            "node": "Sales Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Nurture Handoff": {
+      "main": [
+        [
+          {
+            "node": "Nurture Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Rejection": {
+      "main": [
+        [
+          {
+            "node": "Rejected Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

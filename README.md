@@ -12,6 +12,7 @@ repeatable validation instead of relying on screenshots or unverified claims.
 | [SLA Sentinel](projects/n8n-sla-sentinel) | n8n automation | Validated support intake, deterministic priority scoring, PII-safe summaries, SLA calculation, native routing, and reproducible workflow tests |
 | [Resilient Feature Kit](projects/flutter-resilient-feature-kit) | Flutter package | Stale-while-revalidate caching, bounded retries, request coalescing, optimistic updates, lifecycle safety, and reusable state widgets |
 | [Prompt Regression Lab](projects/prompt-regression-lab) | AI evaluation | Fixture-backed prompt tests, OpenAI-compatible replay, deterministic assertions, redacted reports, baseline comparison, and CI release gates |
+| [Lead Router](projects/n8n-lead-router) | n8n automation | Validated B2B intake, consent enforcement, explainable ICP scoring, stable ownership, privacy-aware responses, and tested route generation |
 
 ## Engineering principles
 

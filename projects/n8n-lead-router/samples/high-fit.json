@@ -1,0 +1,13 @@
+{
+  "email": "buyer@acme.health",
+  "company": "Acme Health",
+  "website": "https://acme.health",
+  "employeeCount": 180,
+  "annualBudget": 30000,
+  "submittedAt": "2026-08-27T03:00:00Z",
+  "source": "producthunt",
+  "painPoint": "We need a reliable way to route and qualify inbound enterprise leads across our sales team.",
+  "consent": true,
+  "country": "US",
+  "industry": "healthcare"
+}
