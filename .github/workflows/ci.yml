@@ -85,3 +85,26 @@ jobs:
           node-version: "22"
       - name: Build workflow and run tests
         run: npm test
+
+  auth-session-kit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: projects/flutter-auth-session-kit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Resolve dependencies
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze
+      - name: Test
+        run: flutter test
+      - name: Build example for web
+        run: |
+          cd example
+          flutter pub get
+          flutter build web

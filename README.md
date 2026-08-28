@@ -13,6 +13,7 @@ repeatable validation instead of relying on screenshots or unverified claims.
 | [Resilient Feature Kit](projects/flutter-resilient-feature-kit) | Flutter package | Stale-while-revalidate caching, bounded retries, request coalescing, optimistic updates, lifecycle safety, and reusable state widgets |
 | [Prompt Regression Lab](projects/prompt-regression-lab) | AI evaluation | Fixture-backed prompt tests, OpenAI-compatible replay, deterministic assertions, redacted reports, baseline comparison, and CI release gates |
 | [Lead Router](projects/n8n-lead-router) | n8n automation | Validated B2B intake, consent enforcement, explainable ICP scoring, stable ownership, privacy-aware responses, and tested route generation |
+| [Flutter Auth Session Kit](projects/flutter-auth-session-kit) | Flutter package | Session restore, single-flight refresh, logout race protection, typed failures, authorized-call retry, and pluggable secure storage/backend boundaries |
 
 ## Engineering principles
 
