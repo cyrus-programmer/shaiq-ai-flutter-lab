@@ -1,0 +1,15 @@
+{
+  "system": "Answer shipping questions using lookup_order. Never invent delivery data.",
+  "responses": [
+    {
+      "type": "tool_call",
+      "id": "call-order-1",
+      "tool": "lookup_order",
+      "arguments": {"order_id": "ORD-100"}
+    },
+    {
+      "type": "final",
+      "answer": "Order ORD-100 has shipped with North Parcel and its estimated arrival is in 2 days."
+    }
+  ]
+}

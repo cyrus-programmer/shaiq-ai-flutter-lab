@@ -14,6 +14,7 @@ repeatable validation instead of relying on screenshots or unverified claims.
 | [Prompt Regression Lab](projects/prompt-regression-lab) | AI evaluation | Fixture-backed prompt tests, OpenAI-compatible replay, deterministic assertions, redacted reports, baseline comparison, and CI release gates |
 | [Lead Router](projects/n8n-lead-router) | n8n automation | Validated B2B intake, consent enforcement, explainable ICP scoring, stable ownership, privacy-aware responses, and tested route generation |
 | [Flutter Auth Session Kit](projects/flutter-auth-session-kit) | Flutter package | Session restore, single-flight refresh, logout race protection, typed failures, authorized-call retry, and pluggable secure storage/backend boundaries |
+| [ToolSafe Agent Runtime](projects/toolsafe-agent-runtime) | AI agent infrastructure | Tool allowlisting, argument schemas, approval gates, replay protection, execution limits, redacted auditing, and an optional OpenAI-compatible adapter |
 
 ## Engineering principles
 
